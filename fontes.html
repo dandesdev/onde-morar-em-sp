@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fontes e método · Onde Morar Em SP</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M16 6l9 8v12h-6v-7h-6v7H7V14z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=2">
+<style>
+  body { background: var(--page); }
+  .doc { max-width: 760px; margin: 0 auto; padding: 20px 18px 60px; background: var(--surface-1); min-height: 100vh; line-height: 1.55; font-size: 15px; }
+  .doc h1 { font-size: 24px; margin: 6px 0 2px; }
+  .doc h2 { font-size: 13px; margin: 28px 0 8px; }
+  .doc p, .doc li { color: var(--text-primary); }
+  .doc ul { padding-left: 20px; }
+  .doc li { margin: 6px 0; }
+  .doc table { font-size: 13.5px; margin: 8px 0; }
+  .doc td, .doc th { vertical-align: top; padding: 7px 6px; }
+  .doc td:first-child { max-width: none; white-space: normal; font-weight: 600; width: 26%; }
+  .doc a { color: var(--accent); }
+  .back { font-size: 14px; text-decoration: none; }
+  .doc .warn { font-size: 14px; }
+  .muted-p { color: var(--text-secondary); font-size: 13px; }
+  .tablewrap { max-height: none; }
+</style>
+</head>
+<body class="viz-root">
+<main class="doc">
+  <a class="back" href="./">← Voltar ao mapa</a>
+  <h1>Fontes, método e limitações</h1>
+  <p class="muted-p" id="built">Onde Morar Em SP usa apenas dados públicos. Esta página diz de onde vem cada número, como ele é calculado e onde ele pode errar.</p>
+
+  <h2>Fontes dos dados</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Dado</th><th>Fonte</th><th>Período</th></tr></thead>
+    <tbody>
+      <tr><td>Crimes (roubos, furtos, crimes violentos, roubo de veículo)</td>
+        <td>Microdados de boletins de ocorrência da <a href="https://www.ssp.sp.gov.br/estatistica" target="_blank" rel="noopener">Secretaria da Segurança Pública de SP (SSP-SP)</a>, com latitude e longitude de cada ocorrência (<a href="https://www.ssp.sp.gov.br/estatistica/consultas" target="_blank" rel="noopener">consultas e bases</a>).</td>
+        <td>jan/2022 a ago/2026. "Últimos 12 meses" = set/2025 a ago/2026.</td></tr>
+      <tr><td>Ônibus</td><td>Traçados das linhas da SPTrans e corredores de ônibus, via <a href="https://geosampa.prefeitura.sp.gov.br" target="_blank" rel="noopener">GeoSampa</a> (Prefeitura de São Paulo).</td><td>Carga de out/2026.</td></tr>
+      <tr><td>Metrô e trem</td><td>Linhas e estações do Metrô e da CPTM (incluindo projetadas), via GeoSampa.</td><td>2026.</td></tr>
+      <tr><td>Linha 6-Laranja</td><td>Operação assistida desde jul/2026, dias úteis das 10h às 15h: <a href="https://ndmais.com.br/transportes/linha-6-laranja-comeca-a-operar-em-sao-paulo/" target="_blank" rel="noopener">ND+</a>, <a href="https://www.brasildefato.com.br/2026/08/19/linha-laranja-recem-inaugurada-por-tarcisio-segue-em-obra-e-so-recebe-passageiros-para-lazer/" target="_blank" rel="noopener">Brasil de Fato</a>.</td><td>ago/2026.</td></tr>
+      <tr><td>Verde</td><td>Imagem do satélite <a href="https://dataspace.copernicus.eu/explore-data/data-collections/sentinel-data/sentinel-2" target="_blank" rel="noopener">Copernicus Sentinel-2</a> (nível L2A, 10 m), obtida no <a href="https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a" target="_blank" rel="noopener">Microsoft Planetary Computer</a>, e inventário de árvores de rua da Prefeitura (GeoSampa).</td><td>Imagem de 19/jul/2026 (sem nuvens).</td></tr>
+      <tr><td>Mercados, padarias, farmácias, pet shops, veterinários, parques</td><td><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>, extrato da <a href="https://download.geofabrik.de/south-america/brazil/sudeste.html" target="_blank" rel="noopener">Geofabrik</a>.</td><td>11/out/2026.</td></tr>
+      <tr><td>Feiras livres, praças, parques municipais, iluminação pública</td><td>GeoSampa (Prefeitura de São Paulo).</td><td>2025-2026.</td></tr>
+      <tr><td>Avenidas e ruas locais</td><td>Classificação viária da CET, via GeoSampa.</td><td>2026.</td></tr>
+      <tr><td>Distritos</td><td>Limites oficiais dos 96 distritos, via GeoSampa.</td><td>2026.</td></tr>
+      <tr><td>Bairros</td><td>Nomes de bairros do OpenStreetMap. Os limites no mapa são aproximados (gerados por nós), porque São Paulo não tem limites oficiais de bairro.</td><td>11/out/2026.</td></tr>
+      <tr><td>Busca de endereços</td><td><a href="https://photon.komoot.io/" target="_blank" rel="noopener">Photon</a> (Komoot), com dados do OpenStreetMap.</td><td>Ao vivo.</td></tr>
+      <tr><td>Mapa de fundo</td><td>Esri World Light Gray Canvas e World Street Map (Esri, HERE, Garmin, © colaboradores do OpenStreetMap), exibidos com <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>.</td><td>Ao vivo.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Como cada nota é calculada</h2>
+  <p>A cidade é dividida em quadrados de cerca de 250 m. Cada quadrado recebe quatro notas de 0 a 100, e a nota geral é a média delas com os pesos que você escolhe.</p>
+  <ul>
+    <li><b>Segurança:</b> densidade de roubos na rua (via pública, a pedestre ou em praça) num raio de 400 m nos últimos 12 meses, somada com peso menor aos roubos à noite, furtos na rua e crimes violentos (homicídio, latrocínio, tentativa de homicídio). O resultado vira um percentil: 100 = entre os lugares com menos registros da cidade.</li>
+    <li><b>Árvores e verde:</b> 60% do índice de vegetação do satélite (NDVI médio no quadrado) e 40% do número de árvores de rua num raio de 200 m, os dois comparados com o resto da cidade.</li>
+    <li><b>Tudo a pé:</b> minutos a pé até o supermercado, a padaria, a farmácia e a praça ou parque mais próximos (e, com meio peso, pet shop ou veterinário). Até 5 minutos vale 100; 15 minutos ou mais vale 0. Caminhada a 75 m por minuto, com distância em linha reta multiplicada por 1,3 para considerar o traçado das ruas.</li>
+    <li><b>Rua calma:</b> distância até a avenida (arterial, via de trânsito rápido ou rodovia) mais próxima e proporção de ruas locais num raio de 200 m.</li>
+  </ul>
+
+  <h2>Tempo até o destino</h2>
+  <p>O tempo porta a porta é calculado no seu navegador com um modelo próprio, não com o Google Maps. Ele considera caminhada, ônibus, metrô e trem, com baldeações a pé de até 300 m, em horário de pico:</p>
+  <ul>
+    <li>Ônibus a 14 km/h no trânsito comum e 20 km/h em corredor exclusivo; espera média de 5 minutos (os dados públicos não trazem a frequência de cada linha).</li>
+    <li>Metrô e trem com espera igual a meio intervalo entre trens no pico, 2 minutos para chegar à plataforma e 1 para sair.</li>
+    <li>Só linhas de ônibus que rodam das 7h às 19h; linhas noturnas ficam de fora.</li>
+    <li>O cenário "Hoje" deixa a Linha 6 de fora, porque ela ainda não opera no horário de pico. O cenário "Linha 6 operando" simula o trecho Brasilândia–São Joaquim em horário normal.</li>
+  </ul>
+  <p>Use o tempo para comparar lugares. Antes de decidir, confira o trajeto real dos finalistas no app de transporte, num dia útil por volta das 8h.</p>
+
+  <h2 id="alertas">Alertas de dados (⚠)</h2>
+  <p>Alguns números são menos confiáveis em certas partes da cidade. O site mostra um alerta quando encontra estes sinais:</p>
+  <div class="warn"><span aria-hidden="true">⚠</span><div><b>Crime provavelmente subnotificado:</b> menos de 1 furto registrado para cada roubo num raio de 400 m. Na região central são cerca de 4 furtos por roubo (Consolação 4,1; Vila Mariana 3,8). Em distritos como Capão Redondo e Jardim Ângela, a proporção é menor que 0,7. Furto costuma ser registrado quando a pessoa precisa do boletim (seguro, documentos); quando quase ninguém registra, os roubos provavelmente também estão abaixo da realidade. Nesses lugares a nota de segurança tende a parecer melhor do que é.</div></div>
+  <div class="warn"><span aria-hidden="true">⚠</span><div><b>Poucos registros de crime:</b> menos de 8 roubos e furtos na rua registrados em 12 meses num raio de 400 m. Pode ser um lugar tranquilo e com pouco movimento, ou um lugar onde as ocorrências não chegam à polícia. Os dados não permitem separar uma coisa da outra.</div></div>
+  <div class="warn"><span aria-hidden="true">⚠</span><div><b>Comércio talvez incompleto no mapa:</b> a região tem ruas iluminadas e urbanizadas, mas nenhum mercado, padaria ou farmácia aparece no OpenStreetMap a até 600 m. Cerca de 1 em cada 3 quadrados urbanizados da cidade está nessa situação, a maioria nas bordas. Ali a nota "Tudo a pé" pode estar baixa demais.</div></div>
+  <p>No ranking, um ⚠ ao lado do bairro indica que a maior parte dos quadrados dele tem alerta de crime. A camada "Alertas de dados" mostra todos os alertas no mapa.</p>
+
+  <h2>Outras limitações</h2>
+  <ul>
+    <li><b>Lugares movimentados parecem mais perigosos.</b> Uma rua com muito pedestre tem mais roubos por km² mesmo que o risco por pessoa seja menor. Compare lugares parecidos entre si.</li>
+    <li><b>Local da ocorrência.</b> Algumas ocorrências são registradas no endereço aproximado ou no centro da rua; ocorrências sexuais não têm local divulgado pela SSP e não entram no cálculo.</li>
+    <li><b>Padarias e mercadinhos</b> são os mais sub-mapeados no OpenStreetMap, mesmo nas áreas centrais.</li>
+    <li><b>Cobertura:</b> só o município de São Paulo. Cidades vizinhas (Osasco, ABC, Guarulhos) ficam de fora porque os dados da Prefeitura cobrem só a capital.</li>
+    <li><b>Aluguel:</b> o site não mostra preço médio de aluguel por região. Não existe hoje uma tabela pública e completa por bairro; os índices publicados trazem só a média da cidade e listas dos 10 bairros mais caros. Use "Meus imóveis" para comparar anúncios reais.</li>
+  </ul>
+
+  <h2>Meus imóveis e privacidade</h2>
+  <p>Os imóveis que você adiciona ficam guardados só no seu navegador. Nada é enviado a servidor nenhum. Ao usar "Compartilhar lista", os imóveis vão dentro do próprio link; quem recebe o link vê os dados que você incluiu. A busca de endereços envia o texto digitado ao serviço Photon.</p>
+
+  <h2>Licenças e créditos</h2>
+  <ul>
+    <li>Contém dados do OpenStreetMap, © colaboradores do OpenStreetMap, disponíveis sob a <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">Open Database License (ODbL)</a>.</li>
+    <li>Contém dados modificados do Copernicus Sentinel (2026).</li>
+    <li>Dados de segurança pública: SSP-SP. Dados urbanos: Prefeitura de São Paulo, GeoSampa.</li>
+  </ul>
+  <p class="muted-p" id="built-at"></p>
+  <a class="back" href="./">← Voltar ao mapa</a>
+</main>
+<script>
+  fetch("data/meta.json").then((r) => r.json()).then((m) => {
+    document.getElementById("built-at").textContent = `Dados processados em ${new Date(m.built).toLocaleDateString("pt-BR")}.`;
+  }).catch(() => {});
+</script>
+</body>
+</html>

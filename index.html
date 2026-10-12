@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onde Morar Em SP</title>
+<meta name="description" content="Escolha o lugar para onde você vai todo dia e veja, quadra a quadra, onde morar em São Paulo: tempo de transporte, segurança, verde, comércio a pé e ruas calmas.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M16 6l9 8v12h-6v-7h-6v7H7V14z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+<div id="app" class="viz-root">
+  <aside id="side">
+    <header>
+      <div class="title-row"><h1>Onde Morar Em SP</h1><a class="head-link" href="fontes.html">Fontes e método</a></div>
+      <p class="sub" id="tagline">Escolha para onde você vai todo dia. O mapa mostra, quadra a quadra, onde vale a pena morar.</p>
+    </header>
+
+    <section id="dest-section">
+      <h2>Para onde você vai todo dia?</h2>
+      <div class="search">
+        <input id="dest-q" type="search" placeholder="Busque um endereço ou lugar em SP" autocomplete="off" aria-label="Buscar destino">
+        <ul id="dest-results" class="results" hidden></ul>
+      </div>
+      <div class="row-buttons">
+        <button type="button" id="dest-pick" class="btn">Escolher no mapa</button>
+        <button type="button" id="dest-share" class="btn" disabled>Copiar link</button>
+      </div>
+      <div id="dest-current" hidden>
+        <label class="field"><span>Nome do lugar</span><input id="dest-name" type="text" maxlength="40"></label>
+        <p class="hint" id="dest-status"></p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Transporte</h2>
+      <div class="seg" id="scenario">
+        <button data-v="now" class="on">Hoje</button>
+        <button data-v="l6">Linha 6 operando</button>
+      </div>
+      <p class="hint" id="scenario-hint"></p>
+    </section>
+
+    <section>
+      <h2>Filtros</h2>
+      <label class="row" for="maxc"><span>Tempo máximo até o destino (porta a porta)</span><output id="maxc-out"></output></label>
+      <div class="d" id="maxc-help">Escolha um destino para usar este filtro.</div>
+      <input type="range" id="maxc" min="0" max="60" step="5" value="35" disabled>
+      <label class="check"><input type="checkbox" id="nearmetro"> Só a até <output id="metrod-out">800</output> m de metrô/trem</label>
+      <input type="range" id="metrod" min="300" max="1500" step="100" value="800">
+    </section>
+
+    <section>
+      <h2>O que importa na nota</h2>
+      <div id="weights"></div>
+    </section>
+
+    <section>
+      <h2>Mostrar no mapa</h2>
+      <select id="layer" aria-label="Camada do mapa"></select>
+      <div id="legend"></div>
+      <div class="overlays">
+        <label class="check"><input type="checkbox" id="ov-bairros" checked> Bairros (aprox.)</label>
+        <label class="check"><input type="checkbox" id="ov-rail" checked> Metrô e trem</label>
+        <label class="check"><input type="checkbox" id="ov-imoveis" checked> Meus imóveis</label>
+        <label class="check"><input type="checkbox" id="ov-green"> Praças e parques</label>
+        <label class="check"><input type="checkbox" id="ov-roads"> Vias arteriais</label>
+        <label class="check"><input type="checkbox" id="ov-pois"> Mercado, padaria, farmácia, pet (com zoom)</label>
+        <label class="check"><input type="checkbox" id="ov-distritos"> Distritos oficiais</label>
+      </div>
+    </section>
+
+    <section class="grow">
+      <h2>Ranking de bairros <span class="muted" id="rank-note"></span></h2>
+      <div class="tablewrap"><table id="rank">
+        <thead><tr><th>Bairro</th><th title="Nota de 0 a 100 (média das quadras que passam nos filtros)">Nota</th><th title="Mediana do tempo porta a porta até o destino">Min</th><th title="Roubos na rua por km² por ano, últimos 12 meses">Roubos</th><th title="Últimos 12 meses vs média 2022-23">Tend.</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="hint">⚠ = dados de crime incertos na maior parte do bairro (subnotificação provável ou poucos registros). Toque no mapa para ver o detalhe.</p>
+    </section>
+
+    <section id="imoveis-section">
+      <h2>Meus imóveis <span class="muted" id="imoveis-note"></span></h2>
+      <p class="hint">Achou um anúncio no QuintoAndar, ZAP, VivaReal, OLX ou outro site? Guarde aqui para ver no mapa o custo total, o tempo até o destino e como é a região. Fica salvo só neste navegador.</p>
+      <button type="button" id="im-add" class="btn primary">+ Adicionar imóvel</button>
+      <details id="im-filters">
+        <summary>Filtrar imóveis</summary>
+        <div class="grid2">
+          <label class="field"><span>Total mín. (R$)</span><input id="f-min" type="number" min="0" step="100" inputmode="numeric"></label>
+          <label class="field"><span>Total máx. (R$)</span><input id="f-max" type="number" min="0" step="100" inputmode="numeric"></label>
+          <label class="field"><span>Quartos mín.</span><input id="f-quartos" type="number" min="0" max="10" inputmode="numeric"></label>
+          <label class="field"><span>Vagas mín.</span><input id="f-vagas" type="number" min="0" max="10" inputmode="numeric"></label>
+          <label class="field"><span>Área mín. (m²)</span><input id="f-area" type="number" min="0" step="5" inputmode="numeric"></label>
+          <label class="field"><span>Mobília</span><select id="f-mob"><option value="">Tanto faz</option><option value="sim">Mobiliado</option><option value="semi">Semimobiliado</option><option value="nao">Sem mobília</option></select></label>
+        </div>
+        <label class="check"><input type="checkbox" id="f-pet"> Só os que aceitam pet</label>
+      </details>
+      <ul id="im-list" class="im-list"></ul>
+      <div class="row-buttons">
+        <button type="button" id="im-share" class="btn">Compartilhar lista</button>
+        <button type="button" id="im-export" class="btn">Exportar</button>
+        <label class="btn"><input type="file" id="im-import" accept="application/json,.json" hidden>Importar</label>
+      </div>
+    </section>
+
+    <footer>
+      <a href="fontes.html">Fontes dos dados, método e limitações →</a>
+      <p class="d">Dados públicos da SSP-SP, Prefeitura de São Paulo (GeoSampa), Copernicus Sentinel-2 e OpenStreetMap.</p>
+    </footer>
+  </aside>
+  <main id="map">
+    <div id="loading" class="loading">Carregando dados da cidade…</div>
+    <div id="pick-banner" class="pick-banner" hidden>Toque no mapa para escolher o ponto <button type="button" id="pick-cancel">Cancelar</button></div>
+  </main>
+</div>
+
+<div id="sheet" class="viz-root" hidden>
+  <button id="sheet-close" type="button" aria-label="Fechar">Fechar ✕</button>
+  <div id="sheet-body"></div>
+</div>
+
+<dialog id="im-dialog" class="viz-root">
+  <form id="im-form" method="dialog">
+    <h3 id="im-title">Adicionar imóvel</h3>
+    <label class="field"><span>Link do anúncio</span><input name="url" type="url" placeholder="https://…" inputmode="url"></label>
+    <label class="field"><span>Apelido</span><input name="nome" type="text" maxlength="60" placeholder="Ex.: Apê da Rua Tal"></label>
+    <div class="field">
+      <span>Localização</span>
+      <div class="search">
+        <input name="end" type="search" placeholder="Endereço ou rua" autocomplete="off">
+        <ul id="im-results" class="results" hidden></ul>
+      </div>
+      <div class="row-buttons"><button type="button" id="im-pick" class="btn">Marcar no mapa</button><span class="hint" id="im-loc"></span></div>
+    </div>
+    <div class="grid3">
+      <label class="field"><span>Aluguel (R$)</span><input name="aluguel" type="number" min="0" step="10" inputmode="numeric" required></label>
+      <label class="field"><span>Condomínio</span><input name="cond" type="number" min="0" step="10" inputmode="numeric"></label>
+      <label class="field"><span>IPTU por mês</span><input name="iptu" type="number" min="0" step="10" inputmode="numeric"></label>
+    </div>
+    <div class="grid3">
+      <label class="field"><span>Quartos</span><input name="quartos" type="number" min="0" max="10" inputmode="numeric"></label>
+      <label class="field"><span>Vagas</span><input name="vagas" type="number" min="0" max="10" inputmode="numeric"></label>
+      <label class="field"><span>Área (m²)</span><input name="area" type="number" min="0" step="1" inputmode="numeric"></label>
+    </div>
+    <div class="grid2">
+      <label class="field"><span>Aceita pet?</span><select name="pet"><option value="">Não sei</option><option value="sim">Sim</option><option value="nao">Não</option></select></label>
+      <label class="field"><span>Mobília</span><select name="mob"><option value="">Não sei</option><option value="sim">Mobiliado</option><option value="semi">Semimobiliado</option><option value="nao">Sem mobília</option></select></label>
+    </div>
+    <label class="field"><span>Observações</span><textarea name="obs" rows="2" maxlength="300"></textarea></label>
+    <p class="form-error" id="im-error" hidden></p>
+    <div class="row-buttons end">
+      <button type="button" id="im-delete" class="btn danger" hidden>Excluir</button>
+      <button type="button" id="im-cancel" class="btn">Cancelar</button>
+      <button type="submit" class="btn primary">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js?v=4"></script>
+</body>
+</html>
