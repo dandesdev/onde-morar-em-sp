@@ -15,7 +15,8 @@ import os
 import subprocess
 import sys
 import traceback
-from datetime import date, datetime, timezone
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import requests
@@ -104,7 +105,7 @@ def main():
 
     sources_file = WORK / "sources.json"
     sources = json.loads(sources_file.read_text(encoding="utf-8")) if sources_file.exists() else {}
-    now = datetime.now(timezone.utc).isoformat(timespec="minutes")
+    now = datetime.now(ZoneInfo("America/Sao_Paulo")).isoformat(timespec="minutes")  # dates shown on the site are local
     problems = []
     for name, fn in STEPS.items():
         if name not in wanted:

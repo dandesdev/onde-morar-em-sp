@@ -23,6 +23,13 @@ Site estático, sem servidor:
 
 - `index.html`, `app.js`, `style.css`: interface (Leaflet).
 - `router.js`: Web Worker que calcula o tempo de transporte de cada quadrado até o destino sobre a rede em `data/graph.bin.gz`.
-- `data/`: dados já processados (os arquivos `.gz` são descompactados no navegador).
+- `data/`: dados já processados (os arquivos `.gz` são descompactados no navegador). Não ficam no git: são gerados pelo pipeline e publicados pelo GitHub Actions.
+- `pipeline/`: download e processamento dos dados (`update.py` faz tudo; veja o cabeçalho de cada script).
+
+## Atualização automática
+
+O workflow [Atualizar dados](.github/workflows/update-data.yml) roda toda segunda-feira às 06:00 (horário de São Paulo) e também pode ser disparado à mão na aba Actions. Ele baixa as fontes, refaz os dados, confere se os números fazem sentido (incluindo tempos de trajeto conhecidos) e só então publica. Se uma fonte estiver fora do ar, usa a última versão boa dela. A data de cada atualização fica em `pipeline/last_update.json` e no próprio site.
+
+Para rodar localmente: `pip install -r pipeline/requirements.txt` e `python -P pipeline/update.py` (dados em `work/` e `data/`; sirva a pasta com `python -m http.server`).
 
 Compartilhe um destino com `?d=lat,lon&n=Nome` (acrescente `&s=l6` para o cenário com a Linha 6 operando).
