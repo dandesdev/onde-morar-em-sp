@@ -1,0 +1,6 @@
+# built by pipeline/update.py (published by the GitHub Actions workflow, not stored in git)
+data/
+work/
+_site/
+__pycache__/
+*.pyc

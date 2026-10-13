@@ -1,0 +1,42 @@
+name: Publicar site
+
+# Code changes go live right away, reusing the data that is online now.
+# (The data itself is rebuilt by "Atualizar dados".)
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "pipeline/**"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install requests
+      - name: Assemble site with the current online data
+        run: python -P pipeline/assemble.py _site --data-from-live https://dandesdev.github.io/onde-morar-em-sp
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

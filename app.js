@@ -77,7 +77,7 @@
     { id: "ss", label: "Segurança (percentil, 100 = mais seguro)", get: (c) => D.ss[c], dir: "up", fmt: (v) => v.toFixed(0) },
     { id: "rob", label: "Roubos na rua / km² / ano (últimos 12 meses)", get: (c) => D.rob[c], dir: "bad", fmt: (v) => v.toFixed(0) },
     { id: "robn", label: "Roubos na rua à noite / km² / ano", get: (c) => D.robn[c], dir: "bad", fmt: (v) => v.toFixed(0) },
-    { id: "trend", label: "Tendência dos roubos (12m vs 2022-23, %)", get: (c) => (D.rob0[c] >= 15 ? (100 * (D.rob[c] - D.rob0[c])) / D.rob0[c] : null), dir: "div", fixed: [-40, -20, -5, 5, 20, 40], fmt: (v) => (v > 0 ? "+" : "") + v.toFixed(0) },
+    { id: "trend", label: "Tendência dos roubos (últimos 12 meses vs anos-base, %)", get: (c) => (D.rob0[c] >= 15 ? (100 * (D.rob[c] - D.rob0[c])) / D.rob0[c] : null), dir: "div", fixed: [-40, -20, -5, 5, 20, 40], fmt: (v) => (v > 0 ? "+" : "") + v.toFixed(0) },
     { id: "sg", label: "Verde (satélite + árvores de rua)", get: (c) => D.sg[c], dir: "up", fmt: (v) => v.toFixed(0) },
     { id: "se", label: "Tudo a pé (0-100)", get: (c) => D.se[c], dir: "up", fmt: (v) => v.toFixed(0) },
     { id: "sc", label: "Rua calma (0-100)", get: (c) => D.sc[c], dir: "up", fmt: (v) => v.toFixed(0) },
@@ -135,6 +135,8 @@
       fetchJSON("data/stations.json"), fetchJSON("data/meta.json"),
     ]);
     D = cells; N = cells.n;
+    META = meta;
+    showDataDates(meta);
     FLAGS = new Uint8Array(N);
     for (let c = 0; c < N; c++) FLAGS[c] = flagsOf(c);
     workerReady = ask({ type: "init", cells: { i: cells.i, j: cells.j, grid: cells.grid } });
@@ -404,22 +406,19 @@
     selRect = L.rectangle([[lat - g.dlat / 2, lon - g.dlon / 2], [lat + g.dlat / 2, lon + g.dlon / 2]],
       { pane: "over", renderer: svgOver, weight: 3, color: "#0b0b0b", fill: false, interactive: false }).addTo(map);
   }
-  function openDetails(html, latlng) {
-    if (isPhone()) {
-      map.closePopup();
-      $("sheet-body").innerHTML = html;
-      $("sheet").hidden = false;
-      $("sheet").scrollTop = 0;
-    } else {
-      L.popup({ maxWidth: 380, autoPanPaddingTopLeft: L.point(56, 16), autoPanPaddingBottomRight: L.point(16, 16) })
-        .setLatLng(latlng).setContent(html).openOn(map);
-    }
+  // Details always open in one panel centred on the page (scrolls inside if long), on every screen size.
+  function openDetails(html) {
+    $("sheet-body").innerHTML = html;
+    $("sheet").hidden = false;
+    $("sheet").scrollTop = 0;
+    $("sheet-close").focus({ preventScroll: true });
   }
-  $("sheet-close").addEventListener("click", () => { $("sheet").hidden = true; select(null); });
-  map.on("popupclose", () => select(null));
+  const closeDetails = () => { $("sheet").hidden = true; select(null); };
+  $("sheet-close").addEventListener("click", closeDetails);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("sheet").hidden) closeDetails(); });
 
   function cellSummary(c) {
-    const trend = D.rob0[c] >= 15 ? `${D.rob[c] >= D.rob0[c] ? "+" : ""}${Math.round((100 * (D.rob[c] - D.rob0[c])) / D.rob0[c])}% vs 2022-23` : "poucos casos para tendência";
+    const trend = D.rob0[c] >= 15 ? `${D.rob[c] >= D.rob0[c] ? "+" : ""}${Math.round((100 * (D.rob[c] - D.rob0[c])) / D.rob0[c])}% vs ${esc(META.base_label)}` : "poucos casos para tendência";
     const st = S.scenario === "l6" ? [stNameL6[c], stDistL6[c]] : [stNameNow[c], stDistNow[c]];
     return `
       <div class="d">Distrito ${esc(distritoName(c))} · estação mais próxima: ${esc(st[0])} (${Math.round(st[1])} m em linha reta)</div>
@@ -625,8 +624,18 @@
     toggle("ov-pois", () => lazyLayer("pois"), syncPois);
     map.on("moveend", syncPois);
 
-    META = meta;
     map.attributionControl.setPrefix('<a href="fontes.html" target="_blank" rel="noopener">Fontes dos dados</a> · <a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+  }
+
+  function showDataDates(m) {
+    const d = m.built ? new Date(m.built).toLocaleDateString("pt-BR") : "—";
+    const [y, mo] = String(m.crime_last || "").split("-");
+    const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    $("updated").textContent = `Dados atualizados em ${d}${mo ? ` · crimes até ${months[+mo - 1]}/${y}` : ""} · atualização automática toda semana`;
+    const trend = LAYERS.find((l) => l.id === "trend");
+    if (m.base_label) trend.label = `Tendência dos roubos (últimos 12 meses vs ${m.base_label}, %)`;
+    const th = $("rank").querySelector("th:last-child");
+    if (th && m.base_label) th.title = `Últimos 12 meses vs média de ${m.base_label}`;
   }
 
   function setWeight(key, value) {
@@ -678,7 +687,7 @@
     const rows = [...acc.entries()].filter(([, a]) => a.ok >= 3 && a.ok / a.n >= 0.4).map(([b, a]) => {
       a.t.sort((x, y) => x - y);
       const name = D.bairros[b], bm = bairroMeta[name] || {};
-      const base = ((+bm["2022"] || 0) + (+bm["2023"] || 0)) / 2, cur = +bm["12m"] || 0;
+      const by = META.base_years || [], base = by.reduce((s, y) => s + (+bm[String(y)] || 0), 0) / (by.length || 1), cur = +bm["12m"] || 0;
       return { name, d: bm.distrito, score: a.s / a.ok, t: a.t.length ? a.t[a.t.length >> 1] : null, rob: a.rob / a.ok,
                tr: base >= 20 ? (100 * (cur - base)) / base : null, lat: a.lat / a.n, lon: a.lon / a.n, ok: a.ok, n: a.n,
                warn: a.fc / a.ok >= 0.5 ? Math.round((100 * a.fc) / a.ok) : 0 };
@@ -817,7 +826,7 @@
     }
     document.addEventListener("click", (e) => {
       const b = e.target.closest("[data-edit]");
-      if (b) { map.closePopup(); $("sheet").hidden = true; openForm(b.dataset.edit); }
+      if (b) { $("sheet").hidden = true; openForm(b.dataset.edit); }
     });
 
     // ---- form

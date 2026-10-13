@@ -129,8 +129,10 @@ footer li { margin: 3px 0; line-height: 1.4; }
 .pop .cost b { font-size: 16px; }
 .pop .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
-#sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3000; max-height: 78vh; max-height: 78dvh; overflow-y: auto;
-  background: var(--surface-1); border-radius: 14px 14px 0 0; box-shadow: 0 -6px 24px rgba(0,0,0,.25); padding: 8px 16px 24px;
+/* details panel: always centred on the page, scrolls inside when long */
+#sheet { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3000;
+  width: min(440px, calc(100vw - 24px)); max-height: 85vh; max-height: 85dvh; overflow-y: auto;
+  background: var(--surface-1); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.3); padding: 8px 16px 18px;
   -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 #sheet[hidden] { display: none; }
 #sheet-close { position: sticky; top: 0; display: block; margin: 0 0 6px auto; border: 1px solid var(--axis); background: var(--surface-1);
