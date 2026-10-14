@@ -58,6 +58,7 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: v
 .row output { font-variant-numeric: tabular-nums; color: var(--text-secondary); white-space: nowrap; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
 .check { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 4px 0; }
+.check.strong { margin-top: 12px; font-weight: 600; }
 .overlays { margin-top: 10px; }
 #weights .hint { margin: 0 0 4px; }
 #weights .row { margin-top: 10px; }

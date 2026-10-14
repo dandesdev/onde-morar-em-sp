@@ -37,6 +37,7 @@
   const RED = ["#fbd9d6", "#f5b1ab", "#ee8a82", "#e34948", "#c23634", "#972726", "#6b1b1a"];
   const DIVERGING = ["#184f95", "#3987e5", "#9ec5f4", "#f0efec", "#f5b1ab", "#e34948", "#972726"];
   const FILTERED = "#d9d8d2";
+  const UNCERTAIN = "#c3cad8";  // grey with a slight blue tint: this square's number is unreliable
   // data-quality alerts: categorical slots 1-3 + a neutral for "no alert"
   const ALERTS = [
     { col: "#f0efec", label: "Sem alerta" },
@@ -45,7 +46,7 @@
     { col: "#1baf7a", label: "Comércio talvez incompleto no mapa" },
   ];
   const rgb = {};
-  for (const h of [...BLUE, ...RED, ...DIVERGING, FILTERED, ...ALERTS.map((a) => a.col)]) rgb[h] = [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
+  for (const h of [...BLUE, ...RED, ...DIVERGING, FILTERED, UNCERTAIN, ...ALERTS.map((a) => a.col)]) rgb[h] = [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16));
 
   // Data-quality flags per square (bitmask), from data already in cells.json:
   //  1 few records: < 8 street robberies + thefts recorded within 400 m in 12 months
@@ -72,14 +73,14 @@
 
   const LAYERS = [
     // colour classes come from the squares that pass the filters: "which of my options is best"
-    { id: "score", label: "Nota geral, 0 a 100 (seus pesos)", get: (c) => S.score[c], dir: "up", fmt: (v) => v.toFixed(0) },
+    { id: "score", uncertain: 7, label: "Nota geral, 0 a 100 (seus pesos)", get: (c) => S.score[c], dir: "up", fmt: (v) => v.toFixed(0) },
     { id: "commute", label: "Tempo porta a porta até o destino (min)", get: (c) => (S.times ? S.times[c] : null), dir: "low", fixed: [15, 20, 25, 30, 35, 45], fmt: (v) => v.toFixed(0), needsDest: true },
-    { id: "ss", label: "Segurança (percentil, 100 = mais seguro)", get: (c) => D.ss[c], dir: "up", fmt: (v) => v.toFixed(0) },
-    { id: "rob", label: "Roubos na rua / km² / ano (últimos 12 meses)", get: (c) => D.rob[c], dir: "bad", fmt: (v) => v.toFixed(0) },
-    { id: "robn", label: "Roubos na rua à noite / km² / ano", get: (c) => D.robn[c], dir: "bad", fmt: (v) => v.toFixed(0) },
-    { id: "trend", label: "Tendência dos roubos (últimos 12 meses vs anos-base, %)", get: (c) => (D.rob0[c] >= 15 ? (100 * (D.rob[c] - D.rob0[c])) / D.rob0[c] : null), dir: "div", fixed: [-40, -20, -5, 5, 20, 40], fmt: (v) => (v > 0 ? "+" : "") + v.toFixed(0) },
+    { id: "ss", uncertain: 3, label: "Segurança (percentil, 100 = mais seguro)", get: (c) => D.ss[c], dir: "up", fmt: (v) => v.toFixed(0) },
+    { id: "rob", uncertain: 3, label: "Roubos na rua / km² / ano (últimos 12 meses)", get: (c) => D.rob[c], dir: "bad", fmt: (v) => v.toFixed(0) },
+    { id: "robn", uncertain: 3, label: "Roubos na rua à noite / km² / ano", get: (c) => D.robn[c], dir: "bad", fmt: (v) => v.toFixed(0) },
+    { id: "trend", uncertain: 3, label: "Tendência dos roubos (últimos 12 meses vs anos-base, %)", get: (c) => (D.rob0[c] >= 15 ? (100 * (D.rob[c] - D.rob0[c])) / D.rob0[c] : null), dir: "div", fixed: [-40, -20, -5, 5, 20, 40], fmt: (v) => (v > 0 ? "+" : "") + v.toFixed(0) },
     { id: "sg", label: "Verde (satélite + árvores de rua)", get: (c) => D.sg[c], dir: "up", fmt: (v) => v.toFixed(0) },
-    { id: "se", label: "Tudo a pé (0-100)", get: (c) => D.se[c], dir: "up", fmt: (v) => v.toFixed(0) },
+    { id: "se", uncertain: 4, label: "Tudo a pé (0-100)", get: (c) => D.se[c], dir: "up", fmt: (v) => v.toFixed(0) },
     { id: "sc", label: "Rua calma (0-100)", get: (c) => D.sc[c], dir: "up", fmt: (v) => v.toFixed(0) },
     { id: "luz", label: "Postes de iluminação num raio de 150 m", get: (c) => D.luz[c], dir: "up", fmt: (v) => v.toFixed(0) },
     { id: "alerts", label: "⚠ Alertas de dados (subnotificação, dados escassos)", cat: true,
@@ -91,6 +92,7 @@
     scenario: "now",
     weights: Object.fromEntries(CRITERIA.map((c) => [c.key, c.w])),
     maxc: 35, nearMetro: false, metroD: 800, layer: "score",
+    hideUncertain: false,  // remove squares with any data alert from the map and the ranking
     times: null, timesKey: null,
     score: null, ok: null,
     picking: null,           // callback while the user picks a point on the map
@@ -222,13 +224,18 @@
   // ---------------------------------------------------------------- scoring + filters
   function recompute() {
     const w = S.weights, tot = Object.values(w).reduce((a, b) => a + b, 0) || 1;
-    if (!S.score) { S.score = new Float32Array(N); S.ok = new Uint8Array(N); }
+    if (!S.score) { S.score = new Float32Array(N); S.ok = new Uint8Array(N); S.hidden = new Uint8Array(N); }
     const st = S.scenario === "l6" ? stDistL6 : stDistNow;
+    let flaggedInFilters = 0;
     for (let c = 0; c < N; c++) {
       S.score[c] = (w.ss * D.ss[c] + w.sg * D.sg[c] + w.se * D.se[c] + w.sc * D.sc[c]) / tot;
       const timeOk = !S.dest || !S.times || S.times[c] <= S.maxc;
-      S.ok[c] = timeOk && (!S.nearMetro || st[c] <= S.metroD) ? 1 : 0;
+      const pass = timeOk && (!S.nearMetro || st[c] <= S.metroD);
+      if (pass && FLAGS[c]) flaggedInFilters++;
+      S.hidden[c] = S.hideUncertain && FLAGS[c] ? 1 : 0;
+      S.ok[c] = pass && !S.hidden[c] ? 1 : 0;
     }
+    S.flaggedInFilters = flaggedInFilters;
   }
 
   let breaks = [], palette = BLUE;
@@ -238,7 +245,7 @@
     palette = layer.dir === "bad" ? RED : layer.dir === "div" ? DIVERGING : BLUE;
     if (layer.fixed) { breaks = layer.fixed; return; }
     let vals = [];
-    for (let c = 0; c < N; c++) if (S.ok[c]) { const v = layer.get(c); if (v != null && isFinite(v)) vals.push(v); }
+    for (let c = 0; c < N; c++) if (S.ok[c] && !(layer.uncertain && FLAGS[c] & layer.uncertain)) { const v = layer.get(c); if (v != null && isFinite(v)) vals.push(v); }
     if (vals.length < 20) { vals = []; for (let c = 0; c < N; c++) { const v = layer.get(c); if (v != null && isFinite(v)) vals.push(v); } }
     vals.sort((a, b) => a - b);
     breaks = [1, 2, 3, 4, 5, 6].map((k) => vals[Math.floor((k * vals.length) / 7)] ?? 0);
@@ -255,11 +262,12 @@
     const layer = currentLayer(), g = D.grid, px = img.data;
     px.fill(0);
     for (let c = 0; c < N; c++) {
-      const v = layer.get(c);
-      const col = S.ok[c] ? colorFor(v, layer) : null;
-      const [r, gg, b] = rgb[col || FILTERED];
+      if (S.hidden[c]) continue;  // removed by the "dados incertos" switch: transparent
       const o = ((g.nrows - 1 - D.j[c]) * g.ncols + D.i[c]) * 4;
-      px[o] = r; px[o + 1] = gg; px[o + 2] = b; px[o + 3] = col ? 178 : 90;
+      let col = S.ok[c] ? colorFor(layer.get(c), layer) : null, alpha = col ? 178 : 90;
+      if (col && layer.uncertain && FLAGS[c] & layer.uncertain) { col = UNCERTAIN; alpha = 170; }
+      const [r, gg, b] = rgb[col || FILTERED];
+      px[o] = r; px[o + 1] = gg; px[o + 2] = b; px[o + 3] = alpha;
     }
     ctx.putImageData(img, 0, 0);
     overlay.setUrl(canvas.toDataURL());
@@ -322,12 +330,14 @@
     const p = new URLSearchParams();
     if (S.dest) { p.set("d", `${S.dest.lat.toFixed(5)},${S.dest.lon.toFixed(5)}`); p.set("n", S.dest.name); }
     if (S.scenario !== "now") p.set("s", S.scenario);
+    if (S.hideUncertain) p.set("u", "0");
     const q = p.toString();
     history.replaceState(null, "", location.pathname + (q ? `?${q}` : "") + location.hash);
   }
   function restoreFromUrl() {
     const p = new URLSearchParams(location.search);
     if (p.get("s") === "l6") setScenario("l6", true);
+    if (p.get("u") === "0") { S.hideUncertain = true; $("hideuncertain").checked = true; }
     const d = (p.get("d") || "").split(",").map(Number);
     if (d.length === 2 && d.every(isFinite)) setDestination({ lat: d[0], lon: d[1], name: p.get("n") || "Destino" });
   }
@@ -590,6 +600,7 @@
     const maxc = $("maxc");
     maxc.addEventListener("input", () => { S.maxc = +maxc.value; scheduleUpdate(); });
     $("nearmetro").addEventListener("change", (e) => { S.nearMetro = e.target.checked; scheduleUpdate(); });
+    $("hideuncertain").addEventListener("change", (e) => { S.hideUncertain = e.target.checked; writeUrl(); scheduleUpdate(); });
     $("metrod").addEventListener("input", (e) => { S.metroD = +e.target.value; scheduleUpdate(); });
 
     // weights: four linked sliders that always sum to 100
@@ -669,7 +680,8 @@
     $("legend").innerHTML = `<div class="bar">${cols.map((c) => `<span style="background:${c}"></span>`).join("")}</div>
       <div class="ticks">${breaks.map((t, i) => `<span style="left:${(100 * (i + 1)) / 7}%">${layer.fmt(t)}</span>`).join("")}</div>
       <div class="dir"><span>${words[0]}</span><span>${words[1]}</span></div>
-      <div class="d" style="margin-top:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${FILTERED};vertical-align:-1px"></span> fora dos filtros</div>`;
+      <div class="d" style="margin-top:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${FILTERED};vertical-align:-1px"></span> fora dos filtros</div>
+      ${layer.uncertain ? `<div class="d"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${UNCERTAIN};vertical-align:-1px"></span> ⚠ dados incertos ou escassos nesta camada${S.hideUncertain ? " (removidos)" : ""}</div>` : ""}`;
   }
 
   function ranking() {
@@ -725,6 +737,9 @@
     if (opt) opt.disabled = !S.dest;
     if (currentLayer().needsDest && !S.times) { S.layer = "score"; $("layer").value = "score"; }
     recompute();
+    $("uncertain-count").textContent = S.hideUncertain
+      ? `${S.flaggedInFilters.toLocaleString("pt-BR")} quadras removidas do mapa e do ranking.`
+      : `${S.flaggedInFilters.toLocaleString("pt-BR")} das quadras que passam nos filtros têm ⚠ (em cinza azulado no mapa).`;
     classify();
     paint();
     legend();

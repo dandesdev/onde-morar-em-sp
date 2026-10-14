@@ -7,7 +7,7 @@
 <meta name="description" content="Escolha o lugar para onde você vai todo dia e veja, quadra a quadra, onde morar em São Paulo: tempo de transporte, segurança, verde, comércio a pé e ruas calmas.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M16 6l9 8v12h-6v-7h-6v7H7V14z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <div id="app" class="viz-root">
@@ -50,6 +50,8 @@
       <input type="range" id="maxc" min="0" max="60" step="5" value="35" disabled>
       <label class="check"><input type="checkbox" id="nearmetro"> Só a até <output id="metrod-out">800</output> m de metrô/trem</label>
       <input type="range" id="metrod" min="300" max="1500" step="100" value="800">
+      <label class="check strong"><input type="checkbox" id="hideuncertain"> Remover áreas com dados incertos ou escassos (⚠)</label>
+      <div class="d" id="uncertain-count"></div>
     </section>
 
     <section>
@@ -159,6 +161,6 @@
 </dialog>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
