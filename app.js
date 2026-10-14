@@ -342,55 +342,147 @@
     if (d.length === 2 && d.every(isFinite)) setDestination({ lat: d[0], lon: d[1], name: p.get("n") || "Destino" });
   }
 
-  // geocoding: Photon (komoot), OpenStreetMap data
-  async function geocode(q) {
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=7&bbox=${CITY_BBOX.join(",")}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("busca indisponível");
-    const js = await res.json();
-    return js.features.map((f) => {
-      const p = f.properties, [lon, lat] = f.geometry.coordinates;
-      const main = p.name || [p.street, p.housenumber].filter(Boolean).join(", ") || "Ponto";
-      const sub = [p.name && p.street ? [p.street, p.housenumber].filter(Boolean).join(", ") : null, p.district || p.locality, p.city].filter(Boolean).join(" · ");
-      return { lat, lon, main, sub };
-    }).filter((r) => inCity(r.lat, r.lon));
+  // ---- search: two sources queried in parallel, results shown as they arrive
+  //  Esri World Geocoding (fast, ~0.6 s; precise street + number, many businesses and institutions)
+  //  Photon / OpenStreetMap (slower, 5-8 s on the public server; places mapped by the OSM community)
+  const ESRI = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
+  const SP_CENTER = "-46.63,-23.55";
+  // keep a result only if it has the longest word typed and at least half of the meaningful words (prefix match, no accents)
+  const STOP = new Set(["rua", "avenida", "av", "alameda", "praca", "largo", "travessa", "estrada", "dos", "das", "de", "da", "do", "sao", "paulo", "sp"]);
+  const words = (s) => norm(s).split(" ").filter((w) => w.length >= 3 && !STOP.has(w));
+  function relevant(q, r) {
+    const want = words(q).filter((w) => !/^\d+$/.test(w));
+    if (!want.length) return true;
+    const have = words(`${r.main} ${r.sub}`);
+    const has = (w) => have.some((h) => h.startsWith(w) || (w.startsWith(h) && h.length >= 4));
+    const key = want.reduce((a, w) => (w.length > a.length ? w : a), "");  // most distinctive word must be there
+    return has(key) && want.filter(has).length >= Math.ceil(want.length / 2);
+  }
+  const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  async function getJSON(url, signal, ms) {
+    const ctl = new AbortController();
+    const kill = () => ctl.abort();
+    signal?.addEventListener("abort", kill);
+    const t = setTimeout(kill, ms);
+    try {
+      const res = await fetch(url, { signal: ctl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } finally { clearTimeout(t); signal?.removeEventListener("abort", kill); }
+  }
+  const SOURCES = {
+    async esri(q, signal) {
+      const js = await getJSON(`${ESRI}/suggest?f=json&langCode=pt&countryCode=BRA&maxSuggestions=8&location=${SP_CENTER}&searchExtent=${CITY_BBOX.join(",")}&text=${encodeURIComponent(q)}`, signal, 6000);
+      return (js.suggestions || [])
+        .filter((s) => !s.isCollection && /(^|, )São Paulo(,|$)/.test(s.text))  // city of São Paulo only
+        .map((s) => {
+          const parts = s.text.split(", ").filter((p) => p !== "BRA" && p !== "São Paulo" && !/^\d{5}(-\d{3})?$/.test(p));
+          return { src: "esri", main: parts[0], sub: parts.slice(1).join(" · "), text: s.text, magicKey: s.magicKey };
+        });
+    },
+    async photon(q, signal) {
+      const js = await getJSON(`https://photon.komoot.io/api/?limit=8&lang=default&lat=-23.55&lon=-46.63&bbox=${CITY_BBOX.join(",")}&q=${encodeURIComponent(q)}`, signal, 8000);
+      return js.features.map((f) => {
+        const p = f.properties, [lon, lat] = f.geometry.coordinates;
+        const street = [p.street, p.housenumber].filter(Boolean).join(", ");
+        return { src: "osm", lat, lon, main: p.name || street || "Ponto", sub: [p.name ? street : null, p.district || p.locality].filter(Boolean).join(" · ") };
+      }).filter((r) => inCity(r.lat, r.lon));
+    },
+  };
+  async function resolve(r) {  // Esri suggestions carry no coordinates until picked
+    if (r.lat != null) return r;
+    const js = await getJSON(`${ESRI}/findAddressCandidates?f=json&langCode=pt&maxLocations=1&SingleLine=${encodeURIComponent(r.text)}&magicKey=${encodeURIComponent(r.magicKey)}`, null, 8000);
+    const c = js.candidates && js.candidates[0];
+    if (!c) throw new Error("not found");
+    return { ...r, lat: c.location.y, lon: c.location.x };
   }
   async function reverseGeocode(lat, lon) {
     try {
-      const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&limit=1`);
-      const f = (await res.json()).features[0];
-      if (!f) return null;
-      const p = f.properties;
-      return p.name || [p.street, p.housenumber].filter(Boolean).join(", ") || p.district || null;
+      const js = await getJSON(`${ESRI}/reverseGeocode?f=json&langCode=pt&location=${lon},${lat}`, null, 6000);
+      const a = js.address || {};
+      const name = a.PlaceName || [a.Address, a.Neighborhood || a.District].filter(Boolean).join(", ");
+      if (name) return name;
+    } catch { /* fall back to OSM */ }
+    try {
+      const f = (await getJSON(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&limit=1`, null, 10000)).features[0];
+      const p = f && f.properties;
+      return p ? p.name || [p.street, p.housenumber].filter(Boolean).join(", ") || p.district || null : null;
     } catch { return null; }
   }
+
   function searchBox(input, list, onPick) {
-    let timer = 0, seq = 0, items = [];
-    const close = () => { list.hidden = true; list.innerHTML = ""; };
+    const cache = new Map();   // query -> {esri: [...], photon: [...]}
+    let timer = 0, ctl = null, items = [], active = -1, state = {};
+    const close = () => { list.hidden = true; list.innerHTML = ""; active = -1; };
+    const render = () => {
+      // Esri first (faster, exact addresses), then OSM names not already listed
+      const seen = new Set();
+      items = [];
+      for (const src of ["esri", "photon"]) {
+        for (const r of state[src] || []) {
+          const key = norm(r.main) + "|" + norm(r.sub).split(" ").slice(0, 3).join(" ");
+          if (seen.has(norm(r.main)) || seen.has(key)) continue;
+          seen.add(key); seen.add(norm(r.main));
+          items.push(r);
+        }
+      }
+      items = items.slice(0, 9);
+      const pending = ["esri", "photon"].filter((s) => state[s] === undefined);
+      const failed = ["esri", "photon"].filter((s) => state[s] === null);
+      let html = items.map((r, k) => `<li data-k="${k}" class="${k === active ? "active" : ""}" role="option">${esc(r.main)}<span class="d">${esc(r.sub)}</span></li>`).join("");
+      if (pending.length) html += `<li class="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span>${items.length ? "Buscando mais resultados…" : "Buscando…"}</li>`;
+      else if (!items.length) html += `<li class="status">${failed.length === 2 ? "Busca indisponível agora." : "Nada encontrado na cidade de São Paulo."} Tente rua e número (ex.: Rua Barão de Tefé, 72) ou use "Escolher no mapa".</li>`;
+      html += `<li class="src">Busca: Esri e OpenStreetMap (Photon)</li>`;
+      list.innerHTML = html;
+      list.hidden = false;
+    };
+    const run = (q) => {
+      if (ctl) ctl.abort();
+      ctl = new AbortController();
+      const my = ctl;
+      const st = cache.get(q) ? { ...cache.get(q) } : {};  // results of this query only
+      state = st;
+      active = -1;
+      render();
+      for (const src of ["esri", "photon"]) {
+        if (st[src] !== undefined) continue;
+        SOURCES[src](q, my.signal).then((res) => { st[src] = res.filter((r) => relevant(q, r)); }, () => { st[src] = null; }).finally(() => {
+          if (st[src]) cache.set(q, { ...(cache.get(q) || {}), [src]: st[src] });
+          if (my === ctl) render();  // otherwise the user kept typing
+        });
+      }
+    };
     input.addEventListener("input", () => {
       clearTimeout(timer);
+      if (ctl) { ctl.abort(); ctl = null; }  // drop the previous query's requests
       const q = input.value.trim();
       if (q.length < 3) { close(); return; }
-      timer = setTimeout(async () => {
-        const my = ++seq;
-        try {
-          items = await geocode(q);
-          if (my !== seq) return;
-          list.innerHTML = items.length
-            ? items.map((r, k) => `<li data-k="${k}">${esc(r.main)}<span class="d">${esc(r.sub)}</span></li>`).join("")
-            : `<li class="d">Nada encontrado em São Paulo.</li>`;
-          list.hidden = false;
-        } catch { list.innerHTML = `<li class="d">Busca indisponível agora. Use "Escolher no mapa".</li>`; list.hidden = false; }
-      }, 350);
+      // show feedback right away; query after a short pause in typing
+      state = cache.get(q) ? { ...cache.get(q) } : {};
+      render();
+      timer = setTimeout(() => run(q), 250);
     });
-    list.addEventListener("click", (e) => {
-      const li = e.target.closest("li[data-k]");
-      if (!li) return;
-      const r = items[+li.dataset.k];
-      close();
-      onPick(r);
+    const pick = async (k) => {
+      const r = items[k];
+      if (!r) return;
+      list.innerHTML = `<li class="status"><span class="spinner" aria-hidden="true"></span>Localizando ${esc(r.main)}…</li>`;
+      try {
+        const full = await resolve(r);
+        close();
+        if (!inCity(full.lat, full.lon)) { alert("Esse lugar fica fora da cidade de São Paulo."); return; }
+        onPick(full);
+      } catch { list.innerHTML = `<li class="status">Não foi possível localizar esse resultado. Tente outro ou use "Escolher no mapa".</li>`; }
+    };
+    list.addEventListener("click", (e) => { const li = e.target.closest("li[data-k]"); if (li) pick(+li.dataset.k); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { close(); return; }
+      if (list.hidden || !items.length) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        active = (active + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+        render();
+      } else if (e.key === "Enter") { e.preventDefault(); pick(active >= 0 ? active : 0); }
     });
-    input.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
     document.addEventListener("click", (e) => { if (!list.contains(e.target) && e.target !== input) close(); });
   }
 

@@ -175,3 +175,12 @@ dialog h3 { margin: 0 0 4px; }
 .warn a, .src a { color: var(--accent); }
 .warn-mark { color: #b06d00; font-weight: 700; cursor: help; }
 .src { margin-top: 8px; font-size: 10.5px; color: var(--text-muted); line-height: 1.4; }
+
+/* search feedback */
+.results li.status { cursor: default; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
+.results li.status:hover { background: none; }
+.results li.src { cursor: default; font-size: 10.5px; color: var(--text-muted); padding: 4px 10px; }
+.results li.src:hover { background: none; }
+.spinner { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid var(--grid); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
